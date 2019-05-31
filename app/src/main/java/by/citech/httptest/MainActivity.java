@@ -19,6 +19,7 @@ import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
@@ -36,6 +37,20 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.lang.reflect.Type;
+
+
+import okhttp3.WebSocket;
+import rx.Scheduler;
+import rx.schedulers.Schedulers;
+import ua.naiksoftware.stomp.Stomp;
+import ua.naiksoftware.stomp.StompHeader;
+import ua.naiksoftware.stomp.client.StompClient;
+
+import static ua.naiksoftware.stomp.LifecycleEvent.Type.OPENED;
+import static ua.naiksoftware.stomp.LifecycleEvent.Type.CLOSED;
+import static ua.naiksoftware.stomp.LifecycleEvent.Type.ERROR;
 
 
 @SuppressWarnings("all")
@@ -54,6 +69,12 @@ public class MainActivity extends AppCompatActivity {
     private PeerConnection peerConnection;
     private DataChannel dataChannel;
     private List<IceCandidate> candidates = new ArrayList<>();
+
+
+
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,13 +104,34 @@ public class MainActivity extends AppCompatActivity {
         /**
          * Для получения сообщений от JS(т.к клиентская часть написана на JS и использует SockJS)
          */
-        webView.setWebChromeClient(new CustomWebChromeClient());
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.setWebViewClient(new CustomWebClient());
-        webView.loadUrl("http://env-2764881.mycloud.by");
+        //webView.setWebChromeClient(new CustomWebChromeClient());
+        //webView.getSettings().setJavaScriptEnabled(true);
+        //webView.setWebViewClient(new CustomWebClient());
+        //webView.loadUrl("http://env-2764881.mycloud.by");
 
 
         send.setOnClickListener((view) -> {
+
+            /** Реализация Android Stomp. Рабочая, но подключается по стандартной сессии, а не по SockJS */
+            Map<String, String> headerMap = new HashMap<>();
+            headerMap.put("Cookie", "JSESSIONID=" + this.cookieManager.getCookieStore().getCookies().get(0).getValue());
+            StompClient client = Stomp.over(WebSocket.class, "ws://192.168.0.189/cit-websocket/websocket", headerMap);
+            client.connect();
+            client.topic("/topic/info/lionheart66666@mail.ru").subscribe(topicMessage -> {
+                Log.d("TAG", topicMessage.getPayload());
+            });
+            client.lifecycle().subscribe(lifecycleEvent -> {
+                        switch (lifecycleEvent.getType()) {
+                            case OPENED:
+                                Log.e("Log", "OPENED");
+                                break;
+                            case ERROR:
+                                Log.e("TAG", "ERROR" + lifecycleEvent.getException());
+                                break;
+                            case CLOSED:
+                                Log.e("TAG", "CLOSED");
+                        }
+                    });
             //webView.loadUrl("javascript:sendSdp('" + field_pass.getText() + "', '" + field_login.getText() + "')");
             //webView.loadUrl("javascript:sendCandidate('" + field_pass.getText() + "', '" + field_login.getText() + "')");
 
@@ -238,13 +280,13 @@ public class MainActivity extends AppCompatActivity {
             /**
              * Пример добавления куки в запрос и подключения к серверу через webview
              */
-            CookieSyncManager cookieSyncManager = CookieSyncManager.createInstance(webView.getContext());
-            android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
-            cookieManager.setAcceptCookie(true);
-            cookieManager.removeSessionCookie();
-            cookieManager.setCookie("http://env-2764881.mycloud.by","JSESSIONID=" + this.cookieManager.getCookieStore().getCookies().get(0).getValue()+" ; Domain=.env-2764881.mycloud.by");
-            cookieSyncManager.sync();
-            new Handler().postDelayed(() -> webView.loadUrl("http://env-2764881.mycloud.by/admin/home"), 500);
+            //CookieSyncManager cookieSyncManager = CookieSyncManager.createInstance(webView.getContext());
+            //android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+            //cookieManager.setAcceptCookie(true);
+            //cookieManager.removeSessionCookie();
+            //cookieManager.setCookie("http://env-2764881.mycloud.by","JSESSIONID=" + this.cookieManager.getCookieStore().getCookies().get(0).getValue()+" ; Domain=.env-2764881.mycloud.by");
+            //cookieSyncManager.sync();
+            //new Handler().postDelayed(() -> webView.loadUrl("http://env-2764881.mycloud.by/admin/home"), 500);
 
 
 
